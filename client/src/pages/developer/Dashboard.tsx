@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
-import { ListTodo, FolderKanban, Mail, CheckCircle2, Clock, TrendingUp } from 'lucide-react';
+import { ListTodo, FolderKanban, Mail, CheckCircle2, Clock, TrendingUp, Activity, ExternalLink, Code2 } from 'lucide-react';
+import { TaskDetailModal } from '../../components/TaskDetailModal';
 
 export function DeveloperDashboard() {
   const { profile } = useAuth();
@@ -13,7 +14,9 @@ export function DeveloperDashboard() {
     pendingInvitations: 0,
   });
   const [recentTasks, setRecentTasks] = useState<any[]>([]);
+  const [myReviews, setMyReviews] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedTask, setSelectedTask] = useState<any | null>(null);
 
   useEffect(() => {
     loadDashboard();
@@ -36,6 +39,15 @@ export function DeveloperDashboard() {
         pendingInvitations: (invRes.invitations || []).filter((i: any) => i.status === 'pending').length,
       });
       setRecentTasks(tasks.slice(0, 5));
+      
+      const reviews = tasks
+        .filter((t: any) => t.code_reviews && t.code_reviews.length > 0)
+        .map((t: any) => {
+          const latestReview = [...t.code_reviews].sort((a,b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+          return { task: t, review: latestReview };
+        });
+      setMyReviews(reviews);
+      
     } catch (err) {
       console.error(err);
     } finally {
@@ -131,6 +143,68 @@ export function DeveloperDashboard() {
           </div>
         )}
       </div>
+
+      <div className="glass-light rounded-2xl p-6 relative">
+        <div className="flex items-center gap-3 mb-4">
+          <Activity className="w-5 h-5 text-purple-400" />
+          <h2 className="text-lg font-semibold text-surface-100 flex items-center gap-2">
+            My Reviews
+            {myReviews.filter((r) => r.task.status === 'in_review').length > 0 && (
+              <span className="bg-primary-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
+                {myReviews.filter((r) => r.task.status === 'in_review').length} New
+              </span>
+            )}
+          </h2>
+        </div>
+        {myReviews.length === 0 ? (
+          <p className="text-sm text-surface-500 py-4 text-center">No PR reviews yet. Submit a fix to get an AI Code Review.</p>
+        ) : (
+          <div className="space-y-3">
+            {myReviews.map(({ task, review }, idx) => (
+              <div key={idx} className="bg-surface-800/30 border border-surface-800 rounded-xl p-4 flex flex-col md:flex-row gap-4 hover:bg-surface-800/50 transition-colors">
+                 <div className="flex-1">
+                   <div className="flex items-center gap-2 mb-1">
+                      <Code2 className="w-4 h-4 text-surface-400" />
+                      <h3 className="text-sm font-semibold text-surface-200">{task.title}</h3>
+                   </div>
+                   <p className="text-xs text-surface-500 mb-3">{review?.review_data?.summary || 'No detailed summary available.'}</p>
+                   {task.pr_link && (
+                     <a href={task.pr_link} target="_blank" rel="noreferrer" className="text-xs font-medium text-primary-400 hover:text-primary-300 flex items-center gap-1">
+                        View PR <ExternalLink className="w-3 h-3" />
+                     </a>
+                   )}
+                 </div>
+                 <div className="flex flex-col items-start md:items-end justify-between min-w-[120px]">
+                    <span className={`px-2.5 py-1 rounded-lg text-[10px] uppercase tracking-wider font-bold mb-2 ${
+                       task.review_status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' :
+                       task.review_status === 'needs_fix' ? 'bg-red-500/20 text-red-400' :
+                       'bg-amber-500/20 text-amber-400'
+                    }`}>
+                      {task.review_status ? task.review_status.replace('_', ' ') : 'Pending'}
+                    </span>
+                    <button 
+                       onClick={() => setSelectedTask(task)} 
+                       className="text-xs text-surface-400 hover:text-white transition-colors"
+                    >
+                       See full details &rarr;
+                    </button>
+                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {selectedTask && (
+        <TaskDetailModal 
+           task={selectedTask} 
+           onClose={() => setSelectedTask(null)} 
+           onUpdate={() => {
+              setSelectedTask(null);
+              loadDashboard();
+           }} 
+        />
+      )}
     </div>
   );
 }

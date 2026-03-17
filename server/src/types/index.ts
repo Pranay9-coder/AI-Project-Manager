@@ -36,6 +36,12 @@ export interface Project {
 export type TaskPriority = 'low' | 'medium' | 'high' | 'critical';
 export type TaskStatus = 'todo' | 'in_progress' | 'in_review' | 'completed';
 
+export interface TaskTimelineEvent {
+  status_changed_to?: string;
+  note?: string;
+  created_at: string;
+}
+
 export interface Task {
   id: string;
   project_id: string;
@@ -47,6 +53,10 @@ export interface Task {
   status: TaskStatus;
   github_branch?: string;
   github_pr_number?: number;
+  pr_link?: string;
+  review_status?: 'pending' | 'needs_fix' | 'approved';
+  review_comments?: any[];
+  timeline?: TaskTimelineEvent[];
   completed_at?: string;
   created_at?: string;
 }
@@ -55,6 +65,7 @@ export interface CodeReview {
   id: string;
   task_id: string;
   pr_number: number;
+  github_pr_id?: string;
   review_data: {
     bugs: string[];
     vulnerabilities: string[];
@@ -62,6 +73,15 @@ export interface CodeReview {
     performance_issues: string[];
     summary: string;
   };
+  ai_summary?: {
+    required: string;
+    implemented: string;
+    issues: string;
+    fixes: string;
+  };
+  issues_found?: any[];
+  resolved_issues?: any[];
+  final_status?: 'pending' | 'needs_fix' | 'approved';
   created_at?: string;
 }
 

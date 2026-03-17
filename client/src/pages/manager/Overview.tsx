@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
 import { useWebSocket } from '../../hooks/useWebSocket';
@@ -7,6 +8,7 @@ import { FolderKanban, Users, ListTodo, Clock, TrendingUp, CheckCircle2, AlertTr
 
 export function ManagerOverview() {
   const { profile } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     teams: 0,
     projects: 0,
@@ -15,6 +17,8 @@ export function ManagerOverview() {
     pendingInvitations: 0,
   });
   const [recentTasks, setRecentTasks] = useState<any[]>([]);
+  const [allTasks, setAllTasks] = useState<any[]>([]);
+  const [allProjects, setAllProjects] = useState<any[]>([]);
   const [leaderboard, setLeaderboard] = useState<any[]>([]);
   const [riskAlerts, setRiskAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +53,8 @@ export function ManagerOverview() {
         ).length,
       });
       setRecentTasks(tasks.slice(0, 5));
+      setAllTasks(tasks);
+      setAllProjects(projectsRes.projects || []);
       setLeaderboard(analyticsRes.leaderboard || []);
     } catch (err) {
       console.error('Failed to load dashboard:', err);
@@ -66,11 +72,11 @@ export function ManagerOverview() {
   }
 
   const statCards = [
-    { label: 'Teams', value: stats.teams, icon: Users, color: 'from-blue-500/20 to-blue-600/20', iconColor: 'text-blue-400' },
-    { label: 'Projects', value: stats.projects, icon: FolderKanban, color: 'from-purple-500/20 to-purple-600/20', iconColor: 'text-purple-400' },
-    { label: 'Total Tasks', value: stats.totalTasks, icon: ListTodo, color: 'from-amber-500/20 to-amber-600/20', iconColor: 'text-amber-400' },
-    { label: 'Completed', value: stats.completedTasks, icon: CheckCircle2, color: 'from-emerald-500/20 to-emerald-600/20', iconColor: 'text-emerald-400' },
-    { label: 'Pending Invites', value: stats.pendingInvitations, icon: Clock, color: 'from-rose-500/20 to-rose-600/20', iconColor: 'text-rose-400' },
+    { label: 'Teams', value: stats.teams, icon: Users, color: 'from-blue-500/20 to-blue-600/20', iconColor: 'text-blue-400', route: '/dashboard/teams' },
+    { label: 'Projects', value: stats.projects, icon: FolderKanban, color: 'from-purple-500/20 to-purple-600/20', iconColor: 'text-purple-400', route: '/dashboard/projects' },
+    { label: 'Total Tasks', value: stats.totalTasks, icon: ListTodo, color: 'from-amber-500/20 to-amber-600/20', iconColor: 'text-amber-400', route: '/dashboard/tasks' },
+    { label: 'Completed', value: stats.completedTasks, icon: CheckCircle2, color: 'from-emerald-500/20 to-emerald-600/20', iconColor: 'text-emerald-400', route: '/dashboard/tasks' },
+    { label: 'Pending Invites', value: stats.pendingInvitations, icon: Clock, color: 'from-rose-500/20 to-rose-600/20', iconColor: 'text-rose-400', route: '/dashboard/teams' },
   ];
 
   const getStatusColor = (status: string) => {
@@ -121,7 +127,8 @@ export function ManagerOverview() {
         {statCards.map((card, i) => (
           <div
             key={card.label}
-            className="glass-light rounded-2xl p-5 hover:scale-[1.02] transition-transform duration-200 animate-fade-in"
+            onClick={() => navigate(card.route)}
+            className="glass-light rounded-2xl p-5 hover:scale-[1.02] transition-transform duration-200 animate-fade-in cursor-pointer"
             style={{ animationDelay: `${i * 80}ms` }}
           >
             <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${card.color} flex items-center justify-center mb-3`}>
@@ -133,25 +140,45 @@ export function ManagerOverview() {
         ))}
       </div>
 
-      {/* Completion Rate */}
-      <div className="glass-light rounded-2xl p-6">
-        <div className="flex items-center gap-3 mb-4">
-          <TrendingUp className="w-5 h-5 text-primary-400" />
-          <h2 className="text-lg font-semibold text-surface-100">Task Completion Rate</h2>
+      {/* Project-Wise Task Completion */}
+      <div 
+        className="glass-light rounded-2xl p-6" 
+      >
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <TrendingUp className="w-5 h-5 text-primary-400" />
+            <h2 className="text-lg font-semibold text-surface-100">Project-Wise Task Completion</h2>
+          </div>
+          <button onClick={() => navigate('/dashboard/projects')} className="text-xs text-primary-400 hover:text-primary-300">View Projects</button>
         </div>
-        <div className="w-full bg-surface-800 rounded-full h-3 overflow-hidden">
-          <div
-            className="h-full bg-gradient-to-r from-primary-600 to-emerald-500 rounded-full transition-all duration-1000"
-            style={{
-              width: `${stats.totalTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0}%`,
-            }}
-          />
-        </div>
-        <p className="text-sm text-surface-400 mt-2">
-          {stats.totalTasks > 0
-            ? `${Math.round((stats.completedTasks / stats.totalTasks) * 100)}% complete (${stats.completedTasks}/${stats.totalTasks})`
-            : 'No tasks yet'}
-        </p>
+        
+        {allProjects.length === 0 ? (
+          <p className="text-sm text-surface-500 py-2">No projects yet.</p>
+        ) : (
+          <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
+             {allProjects.map(project => {
+                const projTasks = allTasks.filter(t => t.project?.id === project.id || t.project_id === project.id);
+                const total = projTasks.length;
+                const completed = projTasks.filter(t => t.status === 'completed').length;
+                const percentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+                
+                return (
+                  <div key={project.id} className="cursor-pointer group" onClick={() => navigate('/dashboard/projects')}>
+                    <div className="flex justify-between items-end mb-1">
+                      <span className="text-sm font-medium text-surface-200 group-hover:text-primary-400 transition-colors">{project.name}</span>
+                      <span className="text-xs text-surface-400">{percentage}% ({completed}/{total})</span>
+                    </div>
+                    <div className="w-full bg-surface-800 rounded-full h-2 overflow-hidden">
+                      <div
+                        className="h-full bg-gradient-to-r from-primary-600 to-emerald-500 rounded-full transition-all duration-1000"
+                        style={{ width: `${percentage}%` }}
+                      />
+                    </div>
+                  </div>
+                );
+             })}
+          </div>
+        )}
       </div>
 
       {/* Recent Tasks */}

@@ -18,4 +18,14 @@ router.patch('/:taskId/status', TaskController.updateStatus);
 // Assign task (manager only)
 router.patch('/:taskId/assign', requireRole('manager'), TaskController.assignTask);
 
+// PR Review Flows
+// Developer submits a PR / Fix
+router.post('/:taskId/pr', TaskController.submitPR);
+
+// Manager accepts PR
+router.post('/:taskId/pr/accept', requireRole('manager'), TaskController.acceptPR);
+
+// Manager rejects PR
+router.post('/:taskId/pr/reject', requireRole('manager'), TaskController.rejectPR);
+
 export default router;

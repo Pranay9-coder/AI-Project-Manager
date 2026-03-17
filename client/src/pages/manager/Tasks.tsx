@@ -1,11 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../../services/api';
-import { ListTodo, ChevronDown } from 'lucide-react';
+import { ListTodo } from 'lucide-react';
+import { TaskDetailModal } from '../../components/TaskDetailModal';
 
 export function ManagerTasksPage() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [selectedTask, setSelectedTask] = useState<any | null>(null);
 
   useEffect(() => {
     loadTasks();
@@ -94,7 +96,8 @@ export function ManagerTasksPage() {
           {filteredTasks.map((task: any) => (
             <div
               key={task.id}
-              className="glass-light rounded-xl px-5 py-4 hover:bg-surface-800/40 transition-colors"
+              onClick={() => setSelectedTask(task)}
+              className="glass-light rounded-xl px-5 py-4 hover:bg-surface-800/40 transition-colors cursor-pointer"
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0 mr-4">
@@ -120,6 +123,17 @@ export function ManagerTasksPage() {
             </div>
           ))}
         </div>
+      )}
+      
+      {selectedTask && (
+        <TaskDetailModal 
+           task={selectedTask} 
+           onClose={() => setSelectedTask(null)} 
+           onUpdate={() => {
+              setSelectedTask(null);
+              loadTasks();
+           }} 
+        />
       )}
     </div>
   );

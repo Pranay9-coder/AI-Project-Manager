@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { WSEvent, wsService } from '../services/websocket';
 
 export function useWebSocket(event: WSEvent, handler: (data: any) => void) {

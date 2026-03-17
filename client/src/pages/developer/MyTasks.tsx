@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../services/api';
 import { ListTodo } from 'lucide-react';
+import { TaskDetailModal } from '../../components/TaskDetailModal';
 
 export function MyTasksPage() {
   const [tasks, setTasks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
   const [updating, setUpdating] = useState<string | null>(null);
+  const [selectedTask, setSelectedTask] = useState<any | null>(null);
 
   useEffect(() => {
     loadTasks();
@@ -102,7 +104,8 @@ export function MyTasksPage() {
           {filteredTasks.map((task: any) => (
             <div
               key={task.id}
-              className="glass-light rounded-xl px-5 py-4 hover:bg-surface-800/40 transition-colors"
+              onClick={() => setSelectedTask(task)}
+              className="glass-light rounded-xl px-5 py-4 hover:bg-surface-800/40 transition-colors cursor-pointer"
             >
               <div className="flex items-center justify-between">
                 <div className="flex-1 min-w-0 mr-4">
@@ -114,7 +117,7 @@ export function MyTasksPage() {
                     <span>{task.required_role}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-2 flex-shrink-0" onClick={e => e.stopPropagation()}>
                   <span className={`px-2.5 py-1 rounded-lg text-[11px] font-medium ${getPriorityColor(task.priority)}`}>
                     {task.priority}
                   </span>
@@ -139,6 +142,17 @@ export function MyTasksPage() {
             </div>
           ))}
         </div>
+      )}
+      
+      {selectedTask && (
+        <TaskDetailModal 
+           task={selectedTask} 
+           onClose={() => setSelectedTask(null)} 
+           onUpdate={() => {
+              setSelectedTask(null);
+              loadTasks();
+           }} 
+        />
       )}
     </div>
   );

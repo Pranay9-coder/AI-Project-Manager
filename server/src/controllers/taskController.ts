@@ -91,4 +91,81 @@ export class TaskController {
       res.status(500).json({ error: error.message });
     }
   }
+
+  /**
+   * POST /tasks/:taskId/pr
+   * Developer submits a PR
+   */
+  static async submitPR(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { taskId } = req.params;
+      const { prLink } = req.body;
+      
+      if (!prLink) {
+        res.status(400).json({ error: 'prLink is required' });
+        return;
+      }
+      
+      const { task, review } = await TaskService.submitPR(taskId, prLink, req.user!.id);
+      
+      // Notify manager and developer
+      const projectData = await TaskService.getProjectForTask(taskId);
+      if (projectData && projectData.manager_id) {
+        sendToUser(projectData.manager_id, WSEvent.AI_CODE_REVIEW_COMPLETED, { task, review });
+      }
+      sendToUser(req.user!.id, WSEvent.AI_CODE_REVIEW_COMPLETED, { task, review });
+      
+      res.json({ task, review });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /tasks/:taskId/pr/accept
+   * Manager accepts the PR
+   */
+  static async acceptPR(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { taskId } = req.params;
+      
+      const task = await TaskService.acceptPR(taskId, req.user!.id);
+      
+      // Notify developer
+      if (task.assigned_to) {
+        sendToUser(task.assigned_to, WSEvent.TASK_STATUS_UPDATED, { task });
+      }
+      
+      res.json({ task });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  /**
+   * POST /tasks/:taskId/pr/reject
+   * Manager rejects the PR with comments
+   */
+  static async rejectPR(req: AuthRequest, res: Response): Promise<void> {
+    try {
+      const { taskId } = req.params;
+      const { comments } = req.body;
+      
+      if (!comments) {
+        res.status(400).json({ error: 'Comments are required to reject a PR' });
+        return;
+      }
+      
+      const task = await TaskService.rejectPR(taskId, comments, req.user!.id);
+      
+      // Notify developer
+      if (task.assigned_to) {
+        sendToUser(task.assigned_to, WSEvent.TASK_STATUS_UPDATED, { task });
+      }
+      
+      res.json({ task });
+    } catch (error: any) {
+      res.status(500).json({ error: error.message });
+    }
+  }
 }

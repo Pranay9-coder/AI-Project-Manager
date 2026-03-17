@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../services/api';
-import { Users, Plus, ChevronRight, UserMinus } from 'lucide-react';
+import { Users, Plus, ChevronRight, UserMinus, FolderKanban, CheckCircle2, Clock } from 'lucide-react';
 
 export function TeamsPage() {
   const [teams, setTeams] = useState<any[]>([]);
@@ -10,6 +10,8 @@ export function TeamsPage() {
   const [teamName, setTeamName] = useState('');
   const [loading, setLoading] = useState(true);
   const [creating, setCreating] = useState(false);
+  const [allProjects, setAllProjects] = useState<any[]>([]);
+  const [allTasks, setAllTasks] = useState<any[]>([]);
 
   useEffect(() => {
     loadTeams();
@@ -17,10 +19,16 @@ export function TeamsPage() {
 
   const loadTeams = async () => {
     try {
-      const res = await api.getTeams();
+      const [res, projectsRes, tasksRes] = await Promise.all([
+         api.getTeams(),
+         api.getProjects(),
+         api.getTasks(),
+      ]);
       setTeams(res.teams || []);
+      setAllProjects(projectsRes.projects || []);
+      setAllTasks(tasksRes.tasks || []);
     } catch (err) {
-      console.error('Failed to load teams:', err);
+      console.error('Failed to load teams/projects/tasks:', err);
     } finally {
       setLoading(false);
     }
@@ -162,8 +170,28 @@ export function TeamsPage() {
       {selectedTeam && (
         <div className="glass-light rounded-2xl p-6 animate-fade-in">
           <h2 className="text-lg font-semibold text-surface-100 mb-4">
-            {selectedTeam.team_name} — Members
+            {selectedTeam.team_name}
           </h2>
+          
+          {/* Assigned Projects */}
+          <div className="mb-6">
+             <h3 className="text-sm font-semibold text-surface-300 uppercase tracking-wider mb-3 flex items-center gap-2">
+                <FolderKanban className="w-4 h-4" /> Assigned Projects
+             </h3>
+             {allProjects.filter((p) => p.team_id === selectedTeam.id).length === 0 ? (
+                <p className="text-sm text-surface-500 py-2">No projects assigned.</p>
+             ) : (
+                <div className="space-y-2">
+                   {allProjects.filter((p) => p.team_id === selectedTeam.id).map(p => (
+                      <div key={p.id} className="bg-surface-800/20 border border-surface-800 rounded-lg p-3 text-sm text-surface-200">
+                         {p.name}
+                      </div>
+                   ))}
+                </div>
+             )}
+          </div>
+
+          <h3 className="text-sm font-semibold text-surface-300 uppercase tracking-wider mb-3">Team Members & Task Distribution</h3>
           {members.length === 0 ? (
             <p className="text-sm text-surface-500 py-4 text-center">
               No members yet. Send invitations from the Developers page.
@@ -173,10 +201,15 @@ export function TeamsPage() {
               {members.map((m: any) => {
                 const profile = m.profiles;
                 if (!profile) return null;
+                
+                const myTasks = allTasks.filter(t => t.assigned_to === m.developer_id && t.project?.team_id === selectedTeam.id);
+                const completedTasks = myTasks.filter(t => t.status === 'completed').length;
+                const inProgressTasks = myTasks.filter(t => t.status === 'in_progress').length;
+                
                 return (
                   <div
                     key={m.developer_id}
-                    className="flex items-center justify-between px-4 py-3 rounded-xl bg-surface-800/30 hover:bg-surface-800/50 transition-colors"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between px-4 py-3 rounded-xl bg-surface-800/30 hover:bg-surface-800/50 transition-colors gap-4"
                   >
                     <div className="flex items-center gap-3">
                       <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 flex items-center justify-center text-emerald-400 text-xs font-bold">
@@ -187,11 +220,18 @@ export function TeamsPage() {
                         <p className="text-xs text-surface-500">{profile.specialization || 'No specialization'}</p>
                       </div>
                     </div>
+                    
+                    <div className="flex flex-wrap items-center gap-4 text-xs font-medium text-surface-400">
+                       <span className="flex items-center gap-1"><FolderKanban className="w-3.5 h-3.5" /> Total: {myTasks.length}</span>
+                       <span className="flex items-center gap-1 text-blue-400"><Clock className="w-3.5 h-3.5" /> Dev: {inProgressTasks}</span>
+                       <span className="flex items-center gap-1 text-emerald-400"><CheckCircle2 className="w-3.5 h-3.5" /> Done: {completedTasks}</span>
+                    </div>
+
                     <div className="flex items-center gap-2">
-                      {profile.skills?.slice(0, 3).map((skill: string) => (
+                      {profile.skills?.slice(0, 2).map((skill: string) => (
                         <span
                           key={skill}
-                          className="px-2 py-0.5 rounded-lg bg-primary-600/15 text-primary-400 text-[11px] font-medium"
+                          className="px-2 py-0.5 rounded-lg bg-primary-600/15 text-primary-400 text-[11px] font-medium hidden md:inline-block"
                         >
                           {skill}
                         </span>

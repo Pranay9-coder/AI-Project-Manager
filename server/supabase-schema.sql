@@ -249,6 +249,10 @@ ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_repo TEXT;
 
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS github_branch TEXT;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS github_pr_number INTEGER;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS pr_link TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS review_status TEXT DEFAULT 'pending' CHECK (review_status IN ('pending', 'needs_fix', 'approved'));
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS review_comments JSONB DEFAULT '[]'::jsonb;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS timeline JSONB DEFAULT '[]'::jsonb;
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
 
 -- ─── CODE REVIEWS TABLE ──────────────────────────────
@@ -256,7 +260,12 @@ CREATE TABLE IF NOT EXISTS code_reviews (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
   pr_number INTEGER NOT NULL,
+  github_pr_id TEXT,
   review_data JSONB NOT NULL,
+  ai_summary JSONB,
+  issues_found JSONB DEFAULT '[]'::jsonb,
+  resolved_issues JSONB DEFAULT '[]'::jsonb,
+  final_status TEXT DEFAULT 'pending' CHECK (final_status IN ('pending', 'needs_fix', 'approved')),
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 

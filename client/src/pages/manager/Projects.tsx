@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../services/api';
-import { FolderKanban, Plus, Sparkles, Loader2, AlertTriangle } from 'lucide-react';
+import { FolderKanban, Plus, Sparkles, Loader2, AlertTriangle, X } from 'lucide-react';
+import { TaskDetailModal } from '../../components/TaskDetailModal';
 
 export function ProjectsPage() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -17,6 +18,9 @@ export function ProjectsPage() {
   const [recommendedDevs, setRecommendedDevs] = useState<any[]>([]);
   const [recommending, setRecommending] = useState(false);
   const [creationResult, setCreationResult] = useState<any>(null);
+  const [selectedProject, setSelectedProject] = useState<any | null>(null);
+  const [projectTasks, setProjectTasks] = useState<any[]>([]);
+  const [selectedTask, setSelectedTask] = useState<any | null>(null);
 
   useEffect(() => {
     loadData();
@@ -264,7 +268,12 @@ export function ProjectsPage() {
           projects.map((project: any) => (
             <div
               key={project.id}
-              className="glass-light rounded-2xl p-5 hover:scale-[1.01] transition-all duration-200"
+              onClick={async () => {
+                 setSelectedProject(project);
+                 const res = await api.getProjectTasks(project.id);
+                 setProjectTasks(res.tasks || []);
+              }}
+              className="glass-light rounded-2xl p-5 hover:scale-[1.01] transition-all duration-200 cursor-pointer"
             >
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-600/20 flex items-center justify-center flex-shrink-0">
@@ -289,6 +298,94 @@ export function ProjectsPage() {
           ))
         )}
       </div>
+
+      {/* Project Details Modal */}
+      {selectedProject && (
+        <div className="fixed inset-0 z-40 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="bg-surface-900 border border-surface-800 rounded-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl overflow-hidden relative" onClick={e => e.stopPropagation()}>
+            <div className="sticky top-0 z-10 bg-surface-900/90 backdrop-blur border-b border-surface-800 p-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-surface-50">{selectedProject.name}</h2>
+                <div className="flex items-center gap-3 text-sm text-surface-400 mt-1">
+                  <span>Team: {teams.find(t => t.id === selectedProject.team_id)?.team_name || 'Unknown'}</span>
+                </div>
+              </div>
+              <button onClick={() => setSelectedProject(null)} className="p-2 text-surface-400 hover:text-surface-100 transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="mb-6 bg-surface-800/30 p-5 rounded-xl border border-surface-800">
+                 <h3 className="text-sm font-semibold text-surface-100 mb-2">Description</h3>
+                 <p className="text-sm text-surface-300 leading-relaxed">{selectedProject.description}</p>
+              </div>
+
+              <h3 className="text-lg font-semibold text-surface-50 mb-4">Project Tasks</h3>
+              <div className="overflow-x-auto rounded-xl border border-surface-800 bg-surface-800/20">
+                <table className="w-full text-left text-sm text-surface-300">
+                  <thead className="bg-surface-800/50 text-surface-400 text-xs uppercase">
+                    <tr>
+                      <th className="px-4 py-3 font-medium rounded-tl-xl">Task Title</th>
+                      <th className="px-4 py-3 font-medium">Assigned To</th>
+                      <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 font-medium">Review Status</th>
+                      <th className="px-4 py-3 font-medium text-right rounded-tr-xl">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-surface-800/50">
+                    {projectTasks.length === 0 ? (
+                      <tr><td colSpan={5} className="px-4 py-6 text-center text-surface-500">No tasks generated yet</td></tr>
+                    ) : (projectTasks.map((task) => (
+                      <tr key={task.id} className="hover:bg-surface-800/30 transition-colors group">
+                         <td className="px-4 py-3 font-medium text-surface-200">{task.title}</td>
+                         <td className="px-4 py-3">{task.assignee?.name || <span className="text-surface-600">Unassigned</span>}</td>
+                         <td className="px-4 py-3">
+                           <span className="capitalize">{task.status.replace('_', ' ')}</span>
+                         </td>
+                         <td className="px-4 py-3">
+                           {task.review_status ? (
+                             <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider ${
+                               task.review_status === 'approved' ? 'bg-emerald-500/20 text-emerald-400' :
+                               task.review_status === 'needs_fix' ? 'bg-red-500/20 text-red-400' :
+                               'bg-amber-500/20 text-amber-400'
+                             }`}>
+                               {task.review_status.replace('_', ' ')}
+                             </span>
+                           ) : (
+                             <span className="text-surface-600">N/A</span>
+                           )}
+                         </td>
+                         <td className="px-4 py-3 text-right">
+                           <button 
+                             onClick={() => setSelectedTask(task)} 
+                             className="text-primary-400 hover:text-primary-300 text-xs font-semibold"
+                           >
+                             Details
+                           </button>
+                         </td>
+                      </tr>
+                    )))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedTask && (
+        <TaskDetailModal 
+           task={selectedTask} 
+           onClose={() => setSelectedTask(null)} 
+           onUpdate={async () => {
+              setSelectedTask(null);
+              if (selectedProject) {
+                 const res = await api.getProjectTasks(selectedProject.id);
+                 setProjectTasks(res.tasks || []);
+              }
+           }} 
+        />
+      )}
     </div>
   );
 }

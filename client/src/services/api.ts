@@ -117,6 +117,26 @@ class ApiClient {
     return this.request<any>(`/tasks/project/${projectId}`);
   }
 
+  async submitPR(taskId: string, prLink: string) {
+    return this.request<any>(`/tasks/${taskId}/pr`, {
+      method: 'POST',
+      body: JSON.stringify({ prLink }),
+    });
+  }
+
+  async acceptPR(taskId: string) {
+    return this.request<any>(`/tasks/${taskId}/pr/accept`, {
+      method: 'POST',
+    });
+  }
+
+  async rejectPR(taskId: string, comments: string) {
+    return this.request<any>(`/tasks/${taskId}/pr/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ comments }),
+    });
+  }
+
   async updateTaskStatus(taskId: string, status: string) {
     return this.request<any>(`/tasks/${taskId}/status`, {
       method: 'PATCH',

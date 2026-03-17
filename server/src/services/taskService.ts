@@ -91,33 +91,51 @@ export class TaskService {
    * Get tasks assigned to a developer
    */
   static async getDeveloperTasks(developerId: string): Promise<any[]> {
-    const { data, error } = await supabaseAdmin
-      .from('tasks')
-      .select(`
-        *,
-        project:project_id (
-          id,
-          name,
-          description
-        ),
-        code_reviews (
-          id,
-          review_data,
-          issues_found,
-          resolved_issues,
-          ai_summary,
-          final_status,
-          created_at
-        )
-      `)
-      .eq('assigned_to', developerId)
-      .order('created_at', { ascending: false });
+    // Try with code_reviews join first, fall back if table doesn't exist
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('tasks')
+        .select(`
+          *,
+          project:project_id (
+            id,
+            name,
+            description
+          ),
+          code_reviews (
+            id,
+            review_data,
+            issues_found,
+            resolved_issues,
+            ai_summary,
+            final_status,
+            created_at
+          )
+        `)
+        .eq('assigned_to', developerId)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      throw new Error(`Failed to fetch developer tasks: ${error.message}`);
+      if (error) throw error;
+      return data || [];
+    } catch (err: any) {
+      // Fallback without code_reviews (table may not be migrated yet)
+      console.warn('code_reviews table unavailable, falling back:', err.message);
+      const { data, error } = await supabaseAdmin
+        .from('tasks')
+        .select(`
+          *,
+          project:project_id (
+            id,
+            name,
+            description
+          )
+        `)
+        .eq('assigned_to', developerId)
+        .order('created_at', { ascending: false });
+
+      if (error) throw new Error(`Failed to fetch developer tasks: ${error.message}`);
+      return (data || []).map(t => ({ ...t, code_reviews: [] }));
     }
-
-    return data || [];
   }
 
   /**
@@ -197,37 +215,59 @@ export class TaskService {
 
     const projectIds = projects.map((p) => p.id);
 
-    const { data, error } = await supabaseAdmin
-      .from('tasks')
-      .select(`
-        *,
-        assignee:assigned_to (
-          id,
-          name,
-          specialization
-        ),
-        project:project_id (
-          id,
-          name
-        ),
-        code_reviews (
-          id,
-          review_data,
-          issues_found,
-          resolved_issues,
-          ai_summary,
-          final_status,
-          created_at
-        )
-      `)
-      .in('project_id', projectIds)
-      .order('created_at', { ascending: false });
+    // Try with code_reviews join first, fall back if table doesn't exist
+    try {
+      const { data, error } = await supabaseAdmin
+        .from('tasks')
+        .select(`
+          *,
+          assignee:assigned_to (
+            id,
+            name,
+            specialization
+          ),
+          project:project_id (
+            id,
+            name
+          ),
+          code_reviews (
+            id,
+            review_data,
+            issues_found,
+            resolved_issues,
+            ai_summary,
+            final_status,
+            created_at
+          )
+        `)
+        .in('project_id', projectIds)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      throw new Error(`Failed to fetch tasks: ${error.message}`);
+      if (error) throw error;
+      return data || [];
+    } catch (err: any) {
+      // Fallback without code_reviews (table may not be migrated yet)
+      console.warn('code_reviews table unavailable, falling back:', err.message);
+      const { data, error } = await supabaseAdmin
+        .from('tasks')
+        .select(`
+          *,
+          assignee:assigned_to (
+            id,
+            name,
+            specialization
+          ),
+          project:project_id (
+            id,
+            name
+          )
+        `)
+        .in('project_id', projectIds)
+        .order('created_at', { ascending: false });
+
+      if (error) throw new Error(`Failed to fetch tasks: ${error.message}`);
+      return (data || []).map(t => ({ ...t, code_reviews: [] }));
     }
-
-    return data || [];
   }
 
   /**

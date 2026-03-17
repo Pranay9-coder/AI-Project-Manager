@@ -8,6 +8,50 @@ export class AIService {
   private static genAI = new GoogleGenerativeAI(config.gemini.apiKey);
 
   /**
+   * AI Code Review Agent
+   */
+  static async generateCodeReview(diff: string, title: string, body: string): Promise<any> {
+    const model = this.genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+
+    const prompt = `You are an expert AI Code Reviewer. Review the following GitHub Pull Request diff.
+Identify bugs, security vulnerabilities, bad coding practices, and performance issues.
+
+PR Title: ${title}
+PR Body: ${body}
+
+Code Diff:
+${diff.substring(0, 8000)} // truncate to avoid massive payload
+
+Return ONLY a valid JSON object in this exact format:
+{
+  "bugs": ["description of bug 1", "..."],
+  "vulnerabilities": ["security finding 1", "..."],
+  "bad_practices": ["practice issue 1", "..."],
+  "performance_issues": ["perf issue 1", "..."],
+  "summary": "Overall summary of the review"
+}`;
+
+    try {
+      const result = await model.generateContent(prompt);
+      const text = result.response.text();
+      let jsonStr = text.trim();
+      if (jsonStr.startsWith('```json')) jsonStr = jsonStr.slice(7);
+      if (jsonStr.startsWith('```')) jsonStr = jsonStr.slice(3);
+      if (jsonStr.endsWith('```')) jsonStr = jsonStr.slice(0, -3);
+      return JSON.parse(jsonStr.trim());
+    } catch (e: any) {
+      console.warn('⚠️ Gemini Code Review Error:', e.message);
+      return {
+        bugs: [],
+        vulnerabilities: [],
+        bad_practices: [],
+        performance_issues: [],
+        summary: "Code review generated a fallback response due to an AI processing error."
+      };
+    }
+  }
+
+  /**
    * Generate tasks from project description using Gemini
    */
   static async generateTasksFromDescription(
@@ -215,5 +259,38 @@ Guidelines:
     // Bulk insert
     const createdTasks = await TaskService.createBulkTasks(assignedTasks);
     return createdTasks;
+  }
+
+  /**
+   * Predict project risk score (0-100)
+   */
+  static async predictProjectRisk(projectId: string): Promise<number> {
+    const { data: tasks } = await supabaseAdmin
+      .from('tasks')
+      .select('id, status, priority, created_at')
+      .eq('project_id', projectId);
+
+    if (!tasks || tasks.length === 0) return 0;
+
+    let riskScore = 0;
+    const now = new Date().getTime();
+
+    // Basic heuristic approach as fallback or preprocess
+    tasks.forEach(task => {
+      const created = new Date(task.created_at).getTime();
+      const ageDays = (now - created) / (1000 * 60 * 60 * 24);
+
+      if (task.status !== 'completed') {
+        if (task.priority === 'critical') riskScore += 15;
+        if (task.priority === 'high') riskScore += 10;
+        
+        // Age risk: if non-completed task is old
+        if (ageDays > 7) riskScore += 10;
+        if (ageDays > 14) riskScore += 20;
+      }
+    });
+
+    const finalScore = Math.min(100, Math.floor(riskScore / Math.max(1, tasks.length / 2)));
+    return finalScore;
   }
 }

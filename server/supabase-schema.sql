@@ -238,6 +238,37 @@ CREATE POLICY "invitations_insert"
   );
 
 -- Developers can update (accept/reject) their own invitations
-CREATE POLICY "invitations_update"
-  ON invitations FOR UPDATE
   USING (developer_id = auth.uid());
+
+-- =====================================================
+-- ADVANCED FEATURES MIGRATION
+-- =====================================================
+
+-- ─── ADD GITHUB & ANALYTICS FIELDS ───────────────────
+ALTER TABLE projects ADD COLUMN IF NOT EXISTS github_repo TEXT;
+
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS github_branch TEXT;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS github_pr_number INTEGER;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+
+-- ─── CODE REVIEWS TABLE ──────────────────────────────
+CREATE TABLE IF NOT EXISTS code_reviews (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  task_id UUID NOT NULL REFERENCES tasks(id) ON DELETE CASCADE,
+  pr_number INTEGER NOT NULL,
+  review_data JSONB NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_code_reviews_task ON code_reviews(task_id);
+
+ALTER TABLE code_reviews ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "code_reviews_select"
+  ON code_reviews FOR SELECT
+  USING (
+    task_id IN (
+      SELECT id FROM tasks WHERE assigned_to = auth.uid()
+      OR project_id IN (SELECT id FROM projects WHERE manager_id = auth.uid())
+    )
+  );

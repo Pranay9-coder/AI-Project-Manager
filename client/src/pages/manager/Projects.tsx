@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../../services/api';
-import { FolderKanban, Plus, Sparkles, Loader2 } from 'lucide-react';
+import { FolderKanban, Plus, Sparkles, Loader2, AlertTriangle } from 'lucide-react';
 
 export function ProjectsPage() {
   const [projects, setProjects] = useState<any[]>([]);
@@ -12,7 +12,10 @@ export function ProjectsPage() {
     team_id: '',
     name: '',
     description: '',
+    github_repo: '',
   });
+  const [recommendedDevs, setRecommendedDevs] = useState<any[]>([]);
+  const [recommending, setRecommending] = useState(false);
   const [creationResult, setCreationResult] = useState<any>(null);
 
   useEffect(() => {
@@ -44,12 +47,26 @@ export function ProjectsPage() {
       const res = await api.createProject(formData);
       setCreationResult(res);
       setShowCreate(false);
-      setFormData({ team_id: '', name: '', description: '' });
+      setFormData({ team_id: '', name: '', description: '', github_repo: '' });
+      setRecommendedDevs([]);
       await loadData();
     } catch (err: any) {
       alert(err.message);
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleRecommend = async () => {
+    if (!formData.description) return alert('Enter project description first!');
+    setRecommending(true);
+    try {
+      const res = await api.recommendDevelopers(formData.description);
+      setRecommendedDevs(res.recommended || []);
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setRecommending(false);
     }
   };
 
@@ -119,16 +136,55 @@ export function ProjectsPage() {
 
               <div>
                 <label className="block text-sm font-medium text-surface-300 mb-1.5">
-                  Description <span className="text-surface-500">(AI uses this to generate tasks)</span>
+                  GitHub Repository <span className="text-surface-500">(Optional: owner/repo)</span>
                 </label>
+                <input
+                  type="text"
+                  value={formData.github_repo}
+                  onChange={(e) => setFormData({ ...formData, github_repo: e.target.value })}
+                  className="w-full px-4 py-2.5 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 text-sm placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all mb-4"
+                  placeholder="e.g., facebook/react"
+                />
+              </div>
+
+              <div>
+
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-medium text-surface-300">
+                    Description <span className="text-surface-500">(AI uses this to generate tasks)</span>
+                  </label>
+                  <button
+                    type="button"
+                    onClick={handleRecommend}
+                    disabled={recommending || !formData.description}
+                    className="text-xs text-primary-400 font-medium hover:text-primary-300 flex items-center gap-1 disabled:opacity-50"
+                  >
+                    {recommending ? <Loader2 className="w-3 h-3 animate-spin"/> : <Sparkles className="w-3 h-3" />}
+                    Recommend Developers
+                  </button>
+                </div>
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   required
-                  rows={4}
-                  className="w-full px-4 py-2.5 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 text-sm placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all resize-none"
-                  placeholder="Describe the project in detail. The AI will generate tasks based on this description..."
+                  rows={3}
+                  className="w-full px-4 py-2.5 rounded-xl bg-surface-800/50 border border-surface-700/50 text-surface-100 text-sm placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-primary-500/50 transition-all resize-none mb-4"
+                  placeholder="Describe the project in detail..."
                 />
+
+                {recommendedDevs.length > 0 && (
+                  <div className="mb-4 bg-primary-500/10 border border-primary-500/20 rounded-xl p-3 max-h-40 overflow-y-auto">
+                    <p className="text-xs font-semibold text-primary-400 mb-2">AI Recommended Developers for this project:</p>
+                    <div className="space-y-1.5">
+                      {recommendedDevs.map(dev => (
+                        <div key={dev.developer_id} className="flex justify-between items-center text-xs">
+                          <span className="text-surface-200 font-medium">{dev.name} <span className="text-surface-500">({dev.specialization})</span></span>
+                          <span className="text-primary-300">Score: {dev.compositeScore}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2">
@@ -219,8 +275,13 @@ export function ProjectsPage() {
                   <p className="text-xs text-surface-500 mt-0.5 line-clamp-2">
                     {project.description}
                   </p>
-                  <p className="text-xs text-surface-600 mt-2">
-                    {new Date(project.created_at).toLocaleDateString()}
+                  <p className="text-xs text-surface-600 mt-2 flex justify-between items-center">
+                    <span>{new Date(project.created_at).toLocaleDateString()}</span>
+                    {project.riskScore > 60 && (
+                      <span className="text-danger flex items-center gap-1 font-medium bg-danger/10 px-2 py-0.5 rounded">
+                        <AlertTriangle className="w-3 h-3" /> Risk: {project.riskScore}
+                      </span>
+                    )}
                   </p>
                 </div>
               </div>

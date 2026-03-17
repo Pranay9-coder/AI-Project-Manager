@@ -12,6 +12,8 @@ import projectRoutes from './routes/projects';
 import taskRoutes from './routes/tasks';
 import invitationRoutes from './routes/invitations';
 import developerRoutes from './routes/developers';
+import webhookRoutes from './routes/webhooks';
+import analyticsRoutes from './routes/analytics';
 
 // Validate environment
 validateEnv();
@@ -46,6 +48,8 @@ app.use('/api/projects', projectRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/invitations', invitationRoutes);
 app.use('/api/developers', developerRoutes);
+app.use('/api/webhooks', webhookRoutes);
+app.use('/api/analytics', analyticsRoutes);
 
 // ─── Error Handling ───────────────────────────────────────────
 app.use(notFoundHandler);

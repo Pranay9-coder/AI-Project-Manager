@@ -29,6 +29,7 @@ export interface Project {
   manager_id: string;
   name: string;
   description: string;
+  github_repo?: string;
   created_at?: string;
 }
 
@@ -44,7 +45,35 @@ export interface Task {
   required_role: string;
   priority: TaskPriority;
   status: TaskStatus;
+  github_branch?: string;
+  github_pr_number?: number;
+  completed_at?: string;
   created_at?: string;
+}
+
+export interface CodeReview {
+  id: string;
+  task_id: string;
+  pr_number: number;
+  review_data: {
+    bugs: string[];
+    vulnerabilities: string[];
+    bad_practices: string[];
+    performance_issues: string[];
+    summary: string;
+  };
+  created_at?: string;
+}
+
+export interface DeveloperAnalytics {
+  developer_id: string;
+  name: string;
+  specialization: string;
+  tasks_completed: number;
+  avg_completion_time: number;
+  review_quality: number;
+  workload: number;
+  performance_score: number;
 }
 
 export type InvitationStatus = 'pending' | 'accepted' | 'rejected';

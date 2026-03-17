@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { api } from '../../services/api';
-import { FolderKanban, Users, ListTodo, Clock, TrendingUp, CheckCircle2 } from 'lucide-react';
+import { useWebSocket } from '../../hooks/useWebSocket';
+import { WSEvent } from '../../services/websocket';
+import { FolderKanban, Users, ListTodo, Clock, TrendingUp, CheckCircle2, AlertTriangle, Trophy, Star } from 'lucide-react';
 
 export function ManagerOverview() {
   const { profile } = useAuth();
@@ -13,7 +15,14 @@ export function ManagerOverview() {
     pendingInvitations: 0,
   });
   const [recentTasks, setRecentTasks] = useState<any[]>([]);
+  const [leaderboard, setLeaderboard] = useState<any[]>([]);
+  const [riskAlerts, setRiskAlerts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Use the properly typed hook from our hooks file
+  useWebSocket(WSEvent.PROJECT_RISK_ALERT, React.useCallback((data: any) => {
+    setRiskAlerts((prev) => [...prev, data]);
+  }, []));
 
   useEffect(() => {
     loadDashboard();
@@ -21,11 +30,12 @@ export function ManagerOverview() {
 
   const loadDashboard = async () => {
     try {
-      const [teamsRes, projectsRes, tasksRes, invitationsRes] = await Promise.all([
+      const [teamsRes, projectsRes, tasksRes, invitationsRes, analyticsRes] = await Promise.all([
         api.getTeams(),
         api.getProjects(),
         api.getTasks(),
         api.getInvitations(),
+        api.getLeaderboard().catch(() => ({ leaderboard: [] })),
       ]);
 
       const tasks = tasksRes.tasks || [];
@@ -39,6 +49,7 @@ export function ManagerOverview() {
         ).length,
       });
       setRecentTasks(tasks.slice(0, 5));
+      setLeaderboard(analyticsRes.leaderboard || []);
     } catch (err) {
       console.error('Failed to load dashboard:', err);
     } finally {
@@ -89,6 +100,21 @@ export function ManagerOverview() {
         </h1>
         <p className="text-surface-400 mt-1">Here's an overview of your workspace</p>
       </div>
+
+      {/* Alerts */}
+      {riskAlerts.length > 0 && (
+        <div className="space-y-3">
+          {riskAlerts.map((alert, i) => (
+            <div key={i} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-danger/10 border border-danger/20 text-danger animate-fade-in">
+              <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-sm">High Risk Detected: {alert.name}</p>
+                <p className="text-xs opacity-90">Risk Score: {alert.riskScore}/100 based on delays and workload.</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -156,6 +182,60 @@ export function ManagerOverview() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+      </div>
+
+      {/* Developer Leaderboard */}
+      <div className="glass-light rounded-2xl p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <Trophy className="w-5 h-5 text-yellow-400" />
+          <h2 className="text-lg font-semibold text-surface-100">Developer Leaderboard & Analytics</h2>
+        </div>
+        {leaderboard.length === 0 ? (
+          <p className="text-sm text-surface-500 py-4 text-center">No performance data available yet.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-surface-300">
+              <thead className="text-xs uppercase text-surface-500 bg-surface-800/50">
+                <tr>
+                  <th className="px-4 py-3 font-medium rounded-l-lg">Developer</th>
+                  <th className="px-4 py-3 font-medium">Specialization</th>
+                  <th className="px-4 py-3 font-medium text-center">Score</th>
+                  <th className="px-4 py-3 font-medium text-center">Tasks Completed</th>
+                  <th className="px-4 py-3 font-medium text-center">Avg Completion</th>
+                  <th className="px-4 py-3 font-medium text-center">Review Quality</th>
+                  <th className="px-4 py-3 font-medium text-center rounded-r-lg">Workload</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-surface-700/50">
+                {leaderboard.map((dev: any, i: number) => (
+                  <tr key={dev.developer_id} className="hover:bg-surface-800/30 transition-colors">
+                    <td className="px-4 py-3 font-medium flex items-center gap-2">
+                      <span className={`w-6 h-6 rounded flex items-center justify-center text-xs font-bold ${i === 0 ? 'bg-yellow-500/20 text-yellow-500' : i === 1 ? 'bg-slate-300/20 text-slate-300' : i === 2 ? 'bg-amber-700/20 text-amber-600' : 'bg-surface-700 text-surface-400'}`}>
+                        {i + 1}
+                      </span>
+                      {dev.name}
+                    </td>
+                    <td className="px-4 py-3">{dev.specialization}</td>
+                    <td className="px-4 py-3 text-center font-bold text-primary-400">{dev.performance_score}</td>
+                    <td className="px-4 py-3 text-center">{dev.tasks_completed}</td>
+                    <td className="px-4 py-3 text-center">{dev.avg_completion_time} hrs</td>
+                    <td className="px-4 py-3 text-center">
+                      <span className="flex items-center justify-center gap-1">
+                        {dev.review_quality}%
+                        {dev.review_quality > 80 && <Star className="w-3 h-3 text-yellow-500" />}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`px-2 py-1 rounded text-xs ${dev.workload > 5 ? 'bg-danger/20 text-danger' : 'bg-surface-700 text-surface-300'}`}>
+                        {dev.workload} tasks
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>

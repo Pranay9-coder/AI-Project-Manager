@@ -163,6 +163,18 @@ class ApiClient {
   async getSpecializations() {
     return this.request<any>('/developers/specializations');
   }
+
+  async recommendDevelopers(description: string) {
+    return this.request<any>('/developers/recommend', {
+      method: 'POST',
+      body: JSON.stringify({ description }),
+    });
+  }
+
+  // ─── Analytics ────────────────────────────────
+  async getLeaderboard() {
+    return this.request<any>('/analytics/leaderboard');
+  }
 }
 
 export const api = new ApiClient();

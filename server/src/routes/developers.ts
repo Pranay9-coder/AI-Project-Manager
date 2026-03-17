@@ -13,5 +13,10 @@ router.get(
   requireRole('manager'),
   DeveloperController.getSpecializations
 );
+router.post(
+  '/recommend',
+  requireRole('manager'),
+  DeveloperController.recommendDevelopers
+);
 
 export default router;

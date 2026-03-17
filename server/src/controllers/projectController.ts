@@ -91,6 +91,22 @@ export class ProjectController {
       let projects;
       if (req.user!.role_type === 'manager') {
         projects = await ProjectService.getManagerProjects(req.user!.id);
+        
+        // Compute Risk Score and Alert
+        projects = await Promise.all(projects.map(async (p: any) => {
+          const riskScore = await AIService.predictProjectRisk(p.id);
+          
+          if (riskScore > 60) {
+            sendToUser(req.user!.id, WSEvent.PROJECT_RISK_ALERT, {
+              project_id: p.id,
+              name: p.name,
+              riskScore
+            });
+          }
+
+          return { ...p, riskScore };
+        }));
+
       } else {
         projects = await ProjectService.getDeveloperProjects(req.user!.id);
       }
